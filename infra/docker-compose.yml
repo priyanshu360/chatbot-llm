@@ -1,0 +1,113 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: llmuser
+      POSTGRES_PASSWORD: llmpass
+      POSTGRES_DB: llmlog
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../services/db/migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U llmuser -d llmlog"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  ingestion-api:
+    build:
+      context: ..
+      dockerfile: infra/docker/Dockerfile.ingestion-api
+    ports:
+      - "4001:4001"
+    environment:
+      POSTGRES_USER: llmuser
+      POSTGRES_PASSWORD: llmpass
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: llmlog
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      INGESTION_API_PORT: 4001
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ..
+      dockerfile: infra/docker/Dockerfile.ingestion-api
+    entrypoint: ["/worker"]
+    environment:
+      POSTGRES_USER: llmuser
+      POSTGRES_PASSWORD: llmpass
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: llmlog
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  chat-api:
+    build:
+      context: ..
+      dockerfile: infra/docker/Dockerfile.chat-api
+    ports:
+      - "4000:4000"
+    environment:
+      POSTGRES_USER: llmuser
+      POSTGRES_PASSWORD: llmpass
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: llmlog
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      INGESTION_HOST: ingestion-api
+      INGESTION_API_PORT: 4001
+      CHAT_API_PORT: 4000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ingestion-api:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: infra/docker/Dockerfile.frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - chat-api
+
+volumes:
+  pgdata:
+  redisdata:

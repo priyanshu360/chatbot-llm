@@ -1,0 +1,13 @@
+FROM golang:1.22-alpine AS builder
+WORKDIR /app
+COPY services/chat-api/go.mod services/chat-api/go.sum ./services/chat-api/
+COPY services/chat-api/vendor ./services/chat-api/vendor
+COPY pkg/go.mod ./pkg/
+COPY . .
+RUN cd services/chat-api && CGO_ENABLED=0 go build -mod=vendor -o /server ./cmd/server
+
+FROM alpine:3.20
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /server /server
+EXPOSE 4000
+ENTRYPOINT ["/server"]

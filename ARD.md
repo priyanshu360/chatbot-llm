@@ -42,11 +42,16 @@ Every LLM inference call produces one row in `inference_logs`:
 | Field | Source | Purpose |
 |-------|--------|---------|
 | `request_id` | UUID generated per call | Deduplication (`ON CONFLICT DO NOTHING`) |
+| `session_id` | Conversation ID | Session grouping for analytics |
+| `conversation_id` | Conversation ID | Conversation lookup |
+| `message_id` | User message UUID | Links inference back to the user message |
 | `provider`, `model` | Chat request | Cost & usage breakdown |
 | `latency_ms` | Wall clock | Performance monitoring |
 | `input_tokens`, `output_tokens` | Provider response | Token accounting |
 | `status` | `success` / `error` / `timeout` | Error rate tracking |
+| `error_code` | Provider error message | Structured error diagnosis (e.g. `deadline_exceeded`, `api error: status 404`) |
 | `input_preview`, `output_preview` | First 200 chars, PII-redacted | Debug samples without exposing sensitive data |
+| `timestamp` | `time.Now().UTC().RFC3339` | When the inference was made |
 
 ### Data Flow
 
@@ -54,10 +59,13 @@ Every LLM inference call produces one row in `inference_logs`:
 LLM call completes
     │
     ▼
-Capture metadata (tokens, latency, preview)
+Capture metadata (tokens, latency, preview, messageID)
     │
     ▼
 Redact PII from previews (regex: email, phone, CC, IP, passport)
+    │
+    ▼
+Check context for deadline exceeded → status = "timeout" / error_code = "deadline_exceeded"
     │
     ▼
 BufferedLogger (in-memory buffer, max 100, TTL 5 min)
@@ -121,6 +129,60 @@ Current tuning:
 - Redis-based (not in-memory) so limits are shared across all Chat API pod replicas
 - Returns `429 Too Many Requests` with `Retry-After: 1` header
 - Only applied to Chat API (Ingestion API is internal)
+
+---
+
+---
+
+## Context Management
+
+### Strategy
+
+Each LLM call truncates historical messages to fit within the model's context window, reserving 20% for the response. Messages are dropped oldest-first, preserving the most recent turns.
+
+### Token Estimation
+
+A fast heuristic (`len(text) / 4`) estimates token counts without a tokenizer dependency. This ~4x ratio is typical for English text and avoids the cost and latency of calling per-model tokenizers on every turn.
+
+### Model Context Windows
+
+Defined in `services/chat-api/internal/service/modelinfo.go`:
+
+| Provider | Model | Context Window |
+|----------|-------|---------------|
+| openai | gpt-4o | 128,000 |
+| openai | gpt-4o-mini | 128,000 |
+| anthropic | claude-sonnet-4-6 | 200,000 |
+| anthropic | claude-haiku-4-5 | 200,000 |
+| gemini | gemini-2.5-flash | 1,000,000 |
+| gemini | gemini-1.5-flash | 1,000,000 |
+| ollama | llama3.2 | 128,000 |
+| ollama | llama3.1 | 128,000 |
+| ollama | mistral | 32,000 |
+| ollama | phi4 | 128,000 |
+| deepseek | deepseek-chat | 65,536 |
+| deepseek | deepseek-reasoner | 65,536 |
+
+Unknown models default to 32,000 as a safe fallback.
+
+### Algorithm
+
+In `StreamChat` (`service/chat.go:99-114`):
+
+1. Compute `budget = contextWindow(provider, model) * 0.8`
+2. Walk `chatHistory` from newest to oldest
+3. Always keep the current user message (last item)
+4. Keep older messages while `remaining budget >= message tokens`
+5. Drop the rest (oldest messages exceed budget)
+
+This is message-count-agnostic — it naturally keeps more short messages (rapid Q&A) and fewer long messages (large code proofs).
+
+### Future Improvements
+
+- Replace heuristic token estimation with per-model tokenizers for precise counts
+- Add summarization of dropped messages instead of dropping entirely
+- Make the budget ratio configurable per-model in the lookup table
+- Cache token counts per message to avoid re-estimating on every turn
 
 ---
 

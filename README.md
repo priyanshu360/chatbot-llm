@@ -2,13 +2,16 @@
 
 Multi-provider LLM chat with streaming responses, conversation management, and async inference log ingestion via Redis streams.
 
-## Quick Start (Docker Compose)
+## Quick Start
+
+### Docker Compose (local dev)
 
 ```bash
 cp .env.example .env
 # Edit .env with your LLM API keys
 
-docker compose -f infra/docker-compose.yml up --build
+make docker-up-build
+# or: docker compose -f infra/docker-compose.yml --env-file=.env up --build
 ```
 
 | Service | URL |
@@ -16,6 +19,22 @@ docker compose -f infra/docker-compose.yml up --build
 | Frontend | http://localhost:5173 |
 | Chat API | http://localhost:4000 |
 | Ingestion API | http://localhost:4001 |
+
+### KinD (Kubernetes)
+
+```bash
+make kind-create          # Create cluster (one-time)
+make build                # Build all Docker images
+make kind-load            # Load images into KinD
+make deploy               # kubectl apply -k infra/k8s/
+# or in one shot:
+make redeploy             # build + kind-load + rollout restart
+```
+
+| Service | Access |
+|--------|--------|
+| Chat API | `kubectl port-forward -n llm-logger svc/chat-api 4000:4000` |
+| Frontend | `kubectl port-forward -n llm-logger svc/frontend 8080:80` |
 
 ## Manual Development
 
@@ -51,13 +70,71 @@ cd services/chat-api && go run ./cmd/server
 cd frontend && npm install && npm run dev
 ```
 
-## Kubernetes
+## Kubernetes (KinD)
+
+### Prerequisites
+
+- [KinD](https://kind.sigs.k8s.io/) v0.31+
+- `kubectl` v1.35+
+
+### Deploy
 
 ```bash
-kubectl apply -k infra/k8s/
+# One-time cluster setup
+make kind-create
+
+# Build, load, and deploy
+make build
+make kind-load
+make deploy
+
+# Access via port-forward
+kubectl port-forward -n llm-logger svc/chat-api 4000:4000    # Chat API → localhost:4000
+kubectl port-forward -n llm-logger svc/frontend 8080:80      # Frontend → localhost:8080
 ```
 
-Requires: Postgres Secret, LLM API Key Secret, Ingress Controller.
+### Redeploy after code changes
+
+```bash
+make redeploy    # Builds images, loads into KinD, restarts all deployments
+```
+
+### Manual rollout restart
+
+```bash
+kubectl rollout restart deployment -n llm-logger -l app
+kubectl wait --namespace llm-logger --for=condition=ready pod -l app --timeout=120s
+```
+
+### Run E2E smoke test
+
+```bash
+make e2e          # Health check + list providers
+```
+
+### All Makefile targets
+
+```bash
+make help
+```
+
+```
+Targets:
+  build              Build all Docker images
+  build-chat         Build chat-api image
+  build-ingestion    Build ingestion-api image
+  build-frontend     Build frontend image
+  kind-load          Load all images into KinD
+  kind-create        Create KinD cluster
+  kind-delete        Delete KinD cluster
+  deploy             Apply kustomize to K8s
+  redeploy           Build + kind-load + rollout restart
+  docker-up          Start local docker-compose
+  docker-down        Stop docker-compose
+  docker-up-build    Rebuild and start docker-compose
+  e2e                Quick health + providers check
+  test               Run Go unit tests
+```
 
 ---
 

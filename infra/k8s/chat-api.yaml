@@ -16,6 +16,7 @@ spec:
       containers:
       - name: chat-api
         image: chatbot-llm/chat-api:latest
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 4000
         env:

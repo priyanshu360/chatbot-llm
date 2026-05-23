@@ -97,19 +97,19 @@ spec:
               key: POSTGRES_PASSWORD
         - name: POSTGRES_DB
           value: llmlog
-		resources:
-		  requests:
-		    cpu: 500m
-		    memory: 1Gi
-		  limits:
-		    cpu: 2
-		    memory: 2Gi
-		volumeMounts:
-		- name: init-sql
-		  mountPath: /docker-entrypoint-initdb.d
-		- name: data
-		  mountPath: /var/lib/postgresql/data
-		readinessProbe:
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2
+            memory: 2Gi
+        volumeMounts:
+        - name: init-sql
+          mountPath: /docker-entrypoint-initdb.d
+        - name: data
+          mountPath: /var/lib/postgresql/data
+        readinessProbe:
           exec:
             command: ["pg_isready", "-U", "llmuser", "-d", "llmlog"]
           initialDelaySeconds: 5

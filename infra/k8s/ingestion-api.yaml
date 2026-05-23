@@ -16,6 +16,7 @@ spec:
       containers:
       - name: ingestion-api
         image: chatbot-llm/ingestion-api:latest
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 4001
         env:
@@ -85,6 +86,7 @@ spec:
       containers:
       - name: worker
         image: chatbot-llm/ingestion-api:latest
+        imagePullPolicy: IfNotPresent
         command: ["/worker"]
         env:
         - name: POSTGRES_USER

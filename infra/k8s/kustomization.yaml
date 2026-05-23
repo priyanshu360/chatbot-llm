@@ -15,6 +15,6 @@ secretGenerator:
     literals:
       - OPENAI_API_KEY=sk-placeholder
       - ANTHROPIC_API_KEY=sk-ant-placeholder
-      - GEMINI_API_KEY=placeholder
+      - GEMINI_API_KEY=AIzaSyCaCTnyW5w5jAi-ex0LoqrwT2dPkcmr1EI
     options:
       disableNameSuffixHash: true

@@ -3,8 +3,6 @@ import { z } from 'zod'
 export const ConversationSchema = z.object({
   id: z.string().uuid(),
   title: z.string(),
-  provider: z.string(),
-  model: z.string(),
   status: z.enum(['active', 'cancelled']),
   created_at: z.string(),
   updated_at: z.string(),
@@ -16,6 +14,8 @@ export const MessageSchema = z.object({
   conversation_id: z.string().uuid(),
   role: z.enum(['user', 'assistant', 'system']),
   content: z.string(),
+  provider: z.string(),
+  model: z.string(),
   seq: z.number().int().nonnegative(),
   created_at: z.string(),
 })
@@ -46,8 +46,6 @@ export type ChatDone = z.infer<typeof ChatDoneSchema>
 
 export const CreateConversationSchema = z.object({
   title: z.string().default(''),
-  provider: z.string().min(1),
-  model: z.string().min(1),
 })
 
 export const ProviderSchema = z.record(z.string(), z.object({

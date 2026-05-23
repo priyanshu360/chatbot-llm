@@ -5,7 +5,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-) 
+)
+
+type APIError struct {
+	StatusCode int
+	Detail     string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("api error: %s", e.Detail)
+}
 
 func readErrorBody(resp *http.Response) string {
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1024))

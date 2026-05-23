@@ -14,7 +14,7 @@ import (
 )
 
 type mockConvSvc struct {
-	createFn  func(ctx context.Context, title, provider, model string) (*pkg.Conversation, error)
+	createFn  func(ctx context.Context, title string) (*pkg.Conversation, error)
 	getFn     func(ctx context.Context, id string) (*pkg.Conversation, error)
 	listFn    func(ctx context.Context) ([]pkg.Conversation, error)
 	cancelFn  func(ctx context.Context, id string) error
@@ -23,8 +23,8 @@ type mockConvSvc struct {
 	msgsFn    func(ctx context.Context, conversationID string) ([]pkg.Message, error)
 }
 
-func (m *mockConvSvc) Create(ctx context.Context, title, provider, model string) (*pkg.Conversation, error) {
-	return m.createFn(ctx, title, provider, model)
+func (m *mockConvSvc) Create(ctx context.Context, title string) (*pkg.Conversation, error) {
+	return m.createFn(ctx, title)
 }
 func (m *mockConvSvc) Get(ctx context.Context, id string) (*pkg.Conversation, error) {
 	return m.getFn(ctx, id)
@@ -108,13 +108,13 @@ func TestConversationsHandler_GetByID_NotFound(t *testing.T) {
 
 func TestConversationsHandler_Create(t *testing.T) {
 	svc := &mockConvSvc{
-		createFn: func(_ context.Context, title, provider, model string) (*pkg.Conversation, error) {
-			return &pkg.Conversation{ID: "new-1", Title: title, Provider: provider, Model: model}, nil
+		createFn: func(_ context.Context, title string) (*pkg.Conversation, error) {
+			return &pkg.Conversation{ID: "new-1", Title: title}, nil
 		},
 	}
 	h := NewConversationsHandler(svc, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}), slog.Default())
 
-	body := `{"title":"test","provider":"openai","model":"gpt-4"}`
+	body := `{"title":"test"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/conversations", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()

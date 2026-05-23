@@ -14,11 +14,12 @@ make docker-up-build
 # or: docker compose -f infra/docker-compose.yml --env-file=.env up --build
 ```
 
-| Service | URL |
-|---------|-----|
-| Frontend | http://localhost:5173 |
-| Chat API | http://localhost:4000 |
-| Ingestion API | http://localhost:4001 |
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| Frontend | http://localhost:5173 | — |
+| Chat API | http://localhost:4000 | — |
+| Ingestion API | http://localhost:4001 | — |
+| Grafana | http://localhost:3000 | admin / admin |
 
 ### KinD (Kubernetes)
 
@@ -35,6 +36,7 @@ make redeploy             # build + kind-load + rollout restart
 |--------|--------|
 | Chat API | `kubectl port-forward -n llm-logger svc/chat-api 4000:4000` |
 | Frontend | `kubectl port-forward -n llm-logger svc/frontend 8080:80` |
+| Grafana | `make grafana-port-forward` (→ localhost:3000) |
 
 ## Manual Development
 
@@ -141,16 +143,19 @@ Targets:
 ## Architecture Overview
 
 ```
-Frontend (React + Vite)
-    │  SSE stream  │  REST
-    ▼              ▼
+                                        Grafana
+                                           │ SQL queries
+                                           ▼
+Frontend (React + Vite)              PostgreSQL
+    │  SSE stream  │  REST               ▲
+    ▼              ▼                     │ batch insert
 Chat API ──→ OpenAI / Anthropic / Gemini / Ollama / DeepSeek
     │
     └─ fire-and-forget POST ──→ Ingestion API
                                       │
                                   Redis Stream
                                       │
-                                  Worker → PostgreSQL
+                                  Worker
 ```
 
 ### Layers
@@ -160,6 +165,8 @@ Chat API ──→ OpenAI / Anthropic / Gemini / Ollama / DeepSeek
 **Ingestion API** — Validates incoming log payloads, publishes to Redis Stream, writes malformed payloads to DLQ
 
 **Worker** — Reads from Redis Stream, batch-inserts valid logs to PostgreSQL, redelivers unacked messages on restart
+
+**Grafana** — Pre-configured with PostgreSQL datasource, auto-loads the LLM Inference Metrics dashboard on startup
 
 ### Project Structure
 
@@ -210,6 +217,50 @@ infra/
 
 ---
 
+## Monitoring & Dashboards
+
+### Grafana + PostgreSQL
+
+Metrics are queried directly from the `inference_logs` table using Grafana's PostgreSQL datasource. No separate metrics pipeline — the same data used for analytics powers the dashboards.
+
+| Dashboard | Panels |
+|-----------|--------|
+| **Latency** | p50/p95/p99 over time, average latency stat |
+| **Throughput** | Requests per minute over time, total requests stat, breakdowns by provider/model |
+| **Errors** | Error rate over time, errors by error code, recent errors table |
+| **Token Usage** | Input vs output tokens over time, total tokens stat |
+
+### Quick Start (Docker Compose)
+
+Grafana starts automatically with `make docker-up-build`:
+
+1. Open http://localhost:3000 (`admin` / `admin`)
+2. The PostgreSQL datasource is pre-configured via provisioning
+3. The **LLM Inference Metrics** dashboard auto-loads with no manual setup
+
+### Access (KinD)
+
+```bash
+make grafana-port-forward     # localhost:3000 → grafana:3000
+```
+
+### Dashboard Source
+
+The dashboard JSON and provisioning config live under `infra/grafana/`:
+
+```
+infra/grafana/
+├── datasources/
+│   └── datasource.yaml        # PostgreSQL datasource config
+└── dashboards/
+    ├── dashboard.yaml         # Dashboard provider config
+    └── llm-inference-metrics.json  # Dashboard definition
+```
+
+For K8s deployments, these are bundled into a ConfigMap at `infra/k8s/grafana.yaml`.
+
+---
+
 ## Key Tradeoffs
 
 | Decision | Rationale | Alternative |
@@ -222,6 +273,7 @@ infra/
 | DLQ for malformed payloads | Zero data loss guarantee — never silently drops | Strict validation + reject (simpler but loses data) |
 | Preview truncated to 200 chars | Enough for analytics without bloating storage | Full content (more storage, no analytics benefit) |
 | Custom Go validator | Zero dependency, type-safe | Zod/Pydantic (more declarative but cross-language) |
+| PostgreSQL as metrics DB | Single DB for apps + analytics keeps ops simple | TimescaleDB (better time-series perf via hypertables), ClickHouse (faster aggregates at scale) |
 
 ---
 
@@ -234,9 +286,10 @@ infra/
 5. **Rate limiting per session** — per-session token budget to prevent runaway spend
 6. **Table partitioning** — partition `inference_logs` by month for query performance at scale
 7. **S3 archive** — move logs older than 90 days to S3 Glacier
-8. **Grafana dashboard** — latency (p50/p95/p99), throughput, error rate
-9. **Alerting** — PagerDuty/Slack on queue depth > 10k, error rate > 5%
-10. **Auth** — API key authentication for ingestion endpoint
+8. **Grafana alerts** — PagerDuty/Slack on queue depth > 10k, error rate > 5%
+9. **Full-text search with Elasticsearch** — search across `input_preview` / `output_preview` in `inference_logs`
+10. **Prometheus application metrics** — `/metrics` endpoints on all services for pod-level CPU/memory/latency
+11. **Auth** — API key authentication for ingestion endpoint
 
 ---
 

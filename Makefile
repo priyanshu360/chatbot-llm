@@ -6,7 +6,7 @@ FRONTEND_IMG ?= chatbot-llm/frontend
 
 .PHONY: all build build-chat build-ingestion build-frontend kind-load \
         kind-load-all deploy redeploy kind-create docker-up docker-down \
-        e2e test help
+        e2e test grafana-port-forward help
 
 all: kind-load-all deploy
 
@@ -66,6 +66,11 @@ docker-down:
 docker-up-build:
 	docker compose -f infra/docker-compose.yml --env-file=.env up -d --build
 
+# --- Grafana ---
+
+grafana-port-forward:
+	kubectl port-forward -n $(NAMESPACE) svc/grafana 3000:3000
+
 # --- E2E ---
 
 e2e:
@@ -95,6 +100,7 @@ help:
 	@echo "  docker-up-build    Rebuild and start docker-compose"
 	@echo "  e2e                Quick health + providers check"
 	@echo "  test               Run Go unit tests"
+	@echo "  grafana-port-forward  Port-forward Grafana to localhost:3000"
 	@echo ""
 	@echo "Variables:"
 	@echo "  KIND_CLUSTER=$(KIND_CLUSTER)    NAMESPACE=$(NAMESPACE)"

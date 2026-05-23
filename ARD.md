@@ -246,6 +246,37 @@ Queue unavailable returns `503`:
 
 ---
 
+## Database Choice for Ingested Logs
+
+The `inference_logs` table stores every LLM inference event and serves as the data
+source for Grafana dashboards (latency, throughput, error rate). Here is why
+PostgreSQL was chosen and how alternatives compare:
+
+| Choice | Rationale |
+|--------|-----------|
+| **PostgreSQL** (chosen) | Already the application database — zero additional infrastructure. Rich SQL with percentile (`percentile_cont`), window functions, and CTEs. Grafana's PostgreSQL datasource provides full query capability. Keeps the stack simple: one operational DB for both transactions and analytics. |
+| **TimescaleDB** (would use given more time) | Native time-series partitioning (automatic chunking by `created_at`), continuous aggregates for pre-rolled metrics, full SQL compatibility. If we had more time, this would be the upgrade path. Hypertables on `created_at` would speed up range queries significantly at scale and reduce storage via compression policies. |
+| **ClickHouse** | Column-oriented OLAP database with blistering-fast aggregate queries. Overkill for current volume (~50k logs/min). Requires separate operational footprint (ZooKeeper/Keeper for replication, merge trees for compaction). Different wire protocol and query dialect. |
+| **InfluxDB** | Purpose-built time-series DB with Flux/InfluxQL. Strong write throughput but different query language than SQL means a separate skillset. Grafana support is good but query patterns don't compose naturally with relational data (e.g., joining with `conversations` for context). |
+| **MongoDB** | Document store with a time-series collection feature. Poor Grafana support — the Grafana MongoDB datasource is community-maintained and lacks the polished SQL/PromQL experience. No native support for percentile aggregations; requires aggregation pipelines for what PostgreSQL does with `percentile_cont`. |
+| **Elasticsearch** | Excellent for full-text search on `input_preview` / `output_preview` (e.g., "find all logs where the user asked about X"). However, for numeric time-series metrics (latency, tokens, counts), PostgreSQL is simpler and more efficient. A future hybrid: Elasticsearch for text search, PostgreSQL for metrics, correlated via `request_id`. |
+
+### Decision rationale
+
+**Keep it simple.** PostgreSQL was already running, the team knew it, and Grafana
+queries it via standard SQL. At the current scale (~50k logs/min, ~500GB/year
+before archival), a single PostgreSQL instance handles both transactional reads
+(conversations/messages) and analytical queries (metrics) without issue. When
+the analytical workload outgrows the transactional instance, we can:
+
+1. Set up a read-replica dedicated to Grafana queries
+2. Migrate to TimescaleDB hypertables for automatic time-based partitioning
+3. Offload historical data to ClickHouse for long-range analytics
+
+All three upgrade paths preserve the existing SQL queries with minimal changes.
+
+---
+
 ## Database Tables
 
 ### conversations

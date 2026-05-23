@@ -83,7 +83,7 @@ func (h *ConversationsHandler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c, err := h.svc.Create(r.Context(), req.Title, req.Provider, req.Model)
+	c, err := h.svc.Create(r.Context(), req.Title)
 	if err != nil {
 		writeError(w, err)
 		return

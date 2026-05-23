@@ -48,7 +48,7 @@ func TestChatService_StreamChat_EmptyMessage(t *testing.T) {
 
 func TestChatService_StreamChat_CancelledConversation(t *testing.T) {
 	convRepo := &mockConvRepo{
-		createFn: func(_ context.Context, title, provider, model string) (*pkg.Conversation, error) {
+		createFn: func(_ context.Context, title string) (*pkg.Conversation, error) {
 			return &pkg.Conversation{ID: "conv-1"}, nil
 		},
 		getByIDFn: func(_ context.Context, id string) (*pkg.Conversation, error) {
@@ -62,7 +62,7 @@ func TestChatService_StreamChat_CancelledConversation(t *testing.T) {
 		nextSeqFn: func(_ context.Context, conversationID string) (int, error) {
 			return 1, nil
 		},
-		insertFn: func(_ context.Context, conversationID, role, content, contentRedacted string, seq int) (*pkg.Message, error) {
+		insertFn: func(_ context.Context, conversationID, role, content, contentRedacted, provider, model string, seq int) (*pkg.Message, error) {
 			return &pkg.Message{ID: "msg-1"}, nil
 		},
 	}
@@ -76,7 +76,7 @@ func TestChatService_StreamChat_CancelledConversation(t *testing.T) {
 func TestChatService_StreamChat_NewConversation(t *testing.T) {
 	created := false
 	convRepo := &mockConvRepo{
-		createFn: func(_ context.Context, title, provider, model string) (*pkg.Conversation, error) {
+		createFn: func(_ context.Context, title string) (*pkg.Conversation, error) {
 			created = true
 			return &pkg.Conversation{ID: "new-conv"}, nil
 		},
@@ -94,7 +94,7 @@ func TestChatService_StreamChat_NewConversation(t *testing.T) {
 		nextSeqFn: func(_ context.Context, conversationID string) (int, error) {
 			return 1, nil
 		},
-		insertFn: func(_ context.Context, conversationID, role, content, contentRedacted string, seq int) (*pkg.Message, error) {
+		insertFn: func(_ context.Context, conversationID, role, content, contentRedacted, provider, model string, seq int) (*pkg.Message, error) {
 			return &pkg.Message{ID: "msg-1"}, nil
 		},
 	}
@@ -131,14 +131,14 @@ func TestChatService_StreamChat_ExistingConversation(t *testing.T) {
 	msgRepo := &mockMsgRepo{
 		getByConversationFn: func(_ context.Context, conversationID string) ([]pkg.Message, error) {
 			return []pkg.Message{
-				{Role: "user", Content: "hi", Seq: 1},
-				{Role: "assistant", Content: "hello", Seq: 2},
+				{Role: "user", Content: "hi", Seq: 1, Provider: "openai", Model: "gpt-4"},
+				{Role: "assistant", Content: "hello", Seq: 2, Provider: "openai", Model: "gpt-4"},
 			}, nil
 		},
 		nextSeqFn: func(_ context.Context, conversationID string) (int, error) {
 			return 3, nil
 		},
-		insertFn: func(_ context.Context, conversationID, role, content, contentRedacted string, seq int) (*pkg.Message, error) {
+		insertFn: func(_ context.Context, conversationID, role, content, contentRedacted, provider, model string, seq int) (*pkg.Message, error) {
 			return &pkg.Message{ID: "msg-3"}, nil
 		},
 	}
@@ -178,8 +178,8 @@ func TestChatService_StreamChat_RepoNotFound(t *testing.T) {
 
 func TestToProviderMessages(t *testing.T) {
 	msgs := []pkg.Message{
-		{Role: "user", Content: "hello", Seq: 1},
-		{Role: "assistant", Content: "world", Seq: 2},
+		{Role: "user", Content: "hello", Seq: 1, Provider: "openai", Model: "gpt-4"},
+		{Role: "assistant", Content: "world", Seq: 2, Provider: "openai", Model: "gpt-4"},
 	}
 	got := toProviderMessages(msgs)
 	if len(got) != 2 {

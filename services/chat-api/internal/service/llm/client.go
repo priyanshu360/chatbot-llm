@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/priyanshu360/chatbot-llm/services/chat-api/internal/service/llm/providers"
@@ -72,10 +73,16 @@ func (c *LLMClient) StreamChat(ctx context.Context, req providers.ChatRequest, c
 		for evt := range providerCh {
 			if evt.Error != nil {
 				status = "error"
-				errorCode = evt.Error.Error()
 				if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 					status = "timeout"
 					errorCode = "deadline_exceeded"
+				} else {
+					var apiErr *providers.APIError
+					if errors.As(evt.Error, &apiErr) {
+						errorCode = strconv.Itoa(apiErr.StatusCode)
+					} else {
+						errorCode = evt.Error.Error()
+					}
 				}
 				c.slog.Debug("provider stream error", "request_id", requestID, "error", evt.Error)
 				out <- StreamEvent{Error: evt.Error}

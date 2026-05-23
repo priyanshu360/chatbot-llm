@@ -6,7 +6,6 @@ var modelMaxContextTokens = map[string]int{
 	"anthropic/claude-sonnet-4-6":      200000,
 	"anthropic/claude-haiku-4-5":       200000,
 	"gemini/gemini-2.5-flash":          1000000,
-	"gemini/gemini-1.5-flash":          1000000,
 	"ollama/llama3.2":                  128000,
 	"ollama/llama3.1":                  128000,
 	"ollama/mistral":                   32000,

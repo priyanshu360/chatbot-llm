@@ -26,6 +26,7 @@ interface ChatState {
   clearStreamState: (sessionId: string) => void
   appendToStream: (sessionId: string, delta: string) => void
   setStreamDone: (sessionId: string) => void
+  cancelAllStreams: () => void
 }
 
 export const useChatStore = create<ChatState>()(
@@ -85,6 +86,12 @@ export const useChatStore = create<ChatState>()(
             },
           },
         })),
+
+      cancelAllStreams: () =>
+        set((state) => {
+          Object.values(state.streams).forEach((s) => s.abortController?.abort())
+          return { streams: {} }
+        }),
     }),
     {
       name: 'chat-store',

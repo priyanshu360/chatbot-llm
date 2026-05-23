@@ -20,15 +20,15 @@ func NewConversationRepo(pool *pgxpool.Pool, logger *slog.Logger) *ConversationR
 	return &ConversationRepo{pool: pool, logger: logger}
 }
 
-func (r *ConversationRepo) Create(ctx context.Context, title, provider, model string) (*pkg.Conversation, error) {
-	r.logger.Debug("creating conversation", "title", title, "provider", provider, "model", model)
+func (r *ConversationRepo) Create(ctx context.Context, title string) (*pkg.Conversation, error) {
+	r.logger.Debug("creating conversation", "title", title)
 	c := &pkg.Conversation{}
 	err := r.pool.QueryRow(ctx,
-		`INSERT INTO conversations (title, provider, model)
-		 VALUES ($1, $2, $3)
-		 RETURNING id, title, provider, model, status, created_at, updated_at`,
-		title, provider, model,
-	).Scan(&c.ID, &c.Title, &c.Provider, &c.Model, &c.Status, &c.CreatedAt, &c.UpdatedAt)
+		`INSERT INTO conversations (title)
+		 VALUES ($1)
+		 RETURNING id, title, status, created_at, updated_at`,
+		title,
+	).Scan(&c.ID, &c.Title, &c.Status, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -38,9 +38,9 @@ func (r *ConversationRepo) Create(ctx context.Context, title, provider, model st
 func (r *ConversationRepo) GetByID(ctx context.Context, id string) (*pkg.Conversation, error) {
 	c := &pkg.Conversation{}
 	err := r.pool.QueryRow(ctx,
-		`SELECT id, title, provider, model, status, created_at, updated_at
+		`SELECT id, title, status, created_at, updated_at
 		 FROM conversations WHERE id = $1`, id,
-	).Scan(&c.ID, &c.Title, &c.Provider, &c.Model, &c.Status, &c.CreatedAt, &c.UpdatedAt)
+	).Scan(&c.ID, &c.Title, &c.Status, &c.CreatedAt, &c.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -53,7 +53,7 @@ func (r *ConversationRepo) GetByID(ctx context.Context, id string) (*pkg.Convers
 func (r *ConversationRepo) List(ctx context.Context) ([]pkg.Conversation, error) {
 	r.logger.Debug("listing conversations")
 	rows, err := r.pool.Query(ctx,
-		`SELECT id, title, provider, model, status, created_at, updated_at
+		`SELECT id, title, status, created_at, updated_at
 		 FROM conversations ORDER BY updated_at DESC LIMIT 100`)
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func (r *ConversationRepo) List(ctx context.Context) ([]pkg.Conversation, error)
 	var conversations []pkg.Conversation
 	for rows.Next() {
 		var c pkg.Conversation
-		if err := rows.Scan(&c.ID, &c.Title, &c.Provider, &c.Model, &c.Status, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Title, &c.Status, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		conversations = append(conversations, c)

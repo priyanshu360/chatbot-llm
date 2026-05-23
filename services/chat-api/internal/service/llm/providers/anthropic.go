@@ -73,7 +73,7 @@ func (p *AnthropicProvider) StreamChat(ctx context.Context, req ChatRequest) (<-
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			ch <- StreamEvent{Error: fmt.Errorf("api error: %s", readErrorBody(resp))}
+			ch <- StreamEvent{Error: &APIError{StatusCode: resp.StatusCode, Detail: readErrorBody(resp)}}
 			return
 		}
 

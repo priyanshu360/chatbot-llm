@@ -9,6 +9,7 @@ resources:
   - chat-api.yaml
   - ingestion-api.yaml
   - frontend.yaml
+  - grafana.yaml
 
 secretGenerator:
   - name: llm-keys

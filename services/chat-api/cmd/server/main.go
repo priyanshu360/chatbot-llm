@@ -78,7 +78,7 @@ func main() {
 	knownModels := map[string][]string{
 		"openai":    {"gpt-4o", "gpt-4o-mini"},
 		"anthropic": {"claude-sonnet-4-6", "claude-haiku-4-5"},
-		"gemini":    {"gemini-2.5-flash", "gemini-1.5-flash"},
+"gemini": {"gemini-2.5-flash"},
 		"ollama":    {"llama3.2", "llama3.1", "mistral", "phi4"},
 		"deepseek":  {"deepseek-chat", "deepseek-reasoner"},
 	}

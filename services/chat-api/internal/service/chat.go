@@ -56,7 +56,7 @@ func (s *ChatService) StreamChat(ctx context.Context, providerName, model, messa
 	}
 
 	if conversationID == "" {
-		c, err := s.convRepo.Create(ctx, util.TruncateTitle(message), providerName, model)
+		c, err := s.convRepo.Create(ctx, util.TruncateTitle(message))
 		if err != nil {
 			return nil, fmt.Errorf("create conversation: %w", err)
 		}
@@ -83,7 +83,7 @@ func (s *ChatService) StreamChat(ctx context.Context, providerName, model, messa
 		return nil, fmt.Errorf("get sequence: %w", err)
 	}
 
-	userMsg, err := s.msgRepo.Insert(ctx, conversationID, "user", message, llm.RedactPII(message), seq)
+	userMsg, err := s.msgRepo.Insert(ctx, conversationID, "user", message, llm.RedactPII(message), providerName, model, seq)
 	if err != nil {
 		return nil, fmt.Errorf("save user message: %w", err)
 	}
@@ -128,7 +128,7 @@ func (s *ChatService) StreamChat(ctx context.Context, providerName, model, messa
 				fullContent += evt.Delta
 			}
 			if evt.Done {
-				if _, err := s.msgRepo.Insert(ctx, conversationID, "assistant", fullContent, llm.RedactPII(fullContent), seq+1); err != nil {
+				if _, err := s.msgRepo.Insert(ctx, conversationID, "assistant", fullContent, llm.RedactPII(fullContent), providerName, model, seq+1); err != nil {
 					s.logger.Error("save assistant message", "error", err)
 				}
 			}

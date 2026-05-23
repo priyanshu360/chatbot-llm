@@ -37,6 +37,8 @@ export function useChatStream() {
               conversation_id: meta.conversation_id,
               role: 'user',
               content: message,
+              provider,
+              model,
               seq: 0,
               created_at: new Date().toISOString(),
             })
@@ -46,9 +48,20 @@ export function useChatStream() {
           onToken: (delta) => {
             appendToStream(sessionId, delta)
           },
-          onDone: () => {
+          onDone: async () => {
             setStreamDone(sessionId)
-            qc.invalidateQueries({ queryKey: ['messages', currentConversationId] })
+            try {
+              const convId = useChatStore.getState().currentConversationId
+              if (convId) {
+                const msgs = await api.getMessages(convId)
+                clearStreamState(sessionId)
+                useChatStore.getState().setMessages(msgs)
+              } else {
+                clearStreamState(sessionId)
+              }
+            } catch {
+              clearStreamState(sessionId)
+            }
           },
           onError: () => {
             setStreamDone(sessionId)

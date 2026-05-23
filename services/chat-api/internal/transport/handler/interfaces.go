@@ -8,7 +8,7 @@ import (
 )
 
 type ConversationService interface {
-	Create(ctx context.Context, title, provider, model string) (*pkg.Conversation, error)
+	Create(ctx context.Context, title string) (*pkg.Conversation, error)
 	Get(ctx context.Context, id string) (*pkg.Conversation, error)
 	List(ctx context.Context) ([]pkg.Conversation, error)
 	Cancel(ctx context.Context, id string) error

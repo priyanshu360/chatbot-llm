@@ -3,10 +3,10 @@ module github.com/priyanshu360/chatbot-llm/services/chat-api
 go 1.22.0
 
 require (
-	github.com/priyanshu360/chatbot-llm/pkg v0.0.0
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/jackc/pgx/v5 v5.7.2
 	github.com/joho/godotenv v1.5.1
+	github.com/priyanshu360/chatbot-llm/pkg v0.0.0
 )
 
 replace github.com/priyanshu360/chatbot-llm/pkg => ../../pkg

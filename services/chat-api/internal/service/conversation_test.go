@@ -11,7 +11,7 @@ import (
 )
 
 type mockConvRepo struct {
-	createFn       func(ctx context.Context, title, provider, model string) (*pkg.Conversation, error)
+	createFn       func(ctx context.Context, title string) (*pkg.Conversation, error)
 	getByIDFn      func(ctx context.Context, id string) (*pkg.Conversation, error)
 	listFn         func(ctx context.Context) ([]pkg.Conversation, error)
 	updateStatusFn func(ctx context.Context, id, status string) error
@@ -19,8 +19,8 @@ type mockConvRepo struct {
 	touchFn        func(ctx context.Context, id string) error
 }
 
-func (m *mockConvRepo) Create(ctx context.Context, title, provider, model string) (*pkg.Conversation, error) {
-	return m.createFn(ctx, title, provider, model)
+func (m *mockConvRepo) Create(ctx context.Context, title string) (*pkg.Conversation, error) {
+	return m.createFn(ctx, title)
 }
 func (m *mockConvRepo) GetByID(ctx context.Context, id string) (*pkg.Conversation, error) {
 	return m.getByIDFn(ctx, id)
@@ -39,13 +39,13 @@ func (m *mockConvRepo) Touch(ctx context.Context, id string) error {
 }
 
 type mockMsgRepo struct {
-	insertFn            func(ctx context.Context, conversationID, role, content, contentRedacted string, seq int) (*pkg.Message, error)
+	insertFn            func(ctx context.Context, conversationID, role, content, contentRedacted, provider, model string, seq int) (*pkg.Message, error)
 	getByConversationFn func(ctx context.Context, conversationID string) ([]pkg.Message, error)
 	nextSeqFn           func(ctx context.Context, conversationID string) (int, error)
 }
 
-func (m *mockMsgRepo) Insert(ctx context.Context, conversationID, role, content, contentRedacted string, seq int) (*pkg.Message, error) {
-	return m.insertFn(ctx, conversationID, role, content, contentRedacted, seq)
+func (m *mockMsgRepo) Insert(ctx context.Context, conversationID, role, content, contentRedacted, provider, model string, seq int) (*pkg.Message, error) {
+	return m.insertFn(ctx, conversationID, role, content, contentRedacted, provider, model, seq)
 }
 func (m *mockMsgRepo) GetByConversation(ctx context.Context, conversationID string) ([]pkg.Message, error) {
 	return m.getByConversationFn(ctx, conversationID)
@@ -58,46 +58,19 @@ var _ ConversationRepository = (*mockConvRepo)(nil)
 var _ MessageRepository = (*mockMsgRepo)(nil)
 
 func TestConversationService_Create(t *testing.T) {
-	t.Run("empty provider returns InputError", func(t *testing.T) {
-		s := NewConversationService(&mockConvRepo{}, &mockMsgRepo{}, slog.Default())
-		_, err := s.Create(context.Background(), "", "", "gpt-4")
-		var inputErr *InputError
-		if !errors.As(err, &inputErr) {
-			t.Fatalf("expected InputError, got %T: %v", err, err)
-		}
-		if inputErr.Field != "provider" {
-			t.Errorf("expected field 'provider', got %q", inputErr.Field)
-		}
-	})
-
-	t.Run("empty model returns InputError", func(t *testing.T) {
-		s := NewConversationService(&mockConvRepo{}, &mockMsgRepo{}, slog.Default())
-		_, err := s.Create(context.Background(), "", "openai", "")
-		var inputErr *InputError
-		if !errors.As(err, &inputErr) {
-			t.Fatalf("expected InputError, got %T: %v", err, err)
-		}
-		if inputErr.Field != "model" {
-			t.Errorf("expected field 'model', got %q", inputErr.Field)
-		}
-	})
-
 	t.Run("valid input calls repo", func(t *testing.T) {
 		called := false
 		repo := &mockConvRepo{
-			createFn: func(_ context.Context, title, provider, model string) (*pkg.Conversation, error) {
+			createFn: func(_ context.Context, title string) (*pkg.Conversation, error) {
 				called = true
-				if provider != "openai" {
-					t.Errorf("expected provider openai, got %q", provider)
+				if title != "test" {
+					t.Errorf("expected title 'test', got %q", title)
 				}
-				if model != "gpt-4" {
-					t.Errorf("expected model gpt-4, got %q", model)
-				}
-				return &pkg.Conversation{ID: "abc", Provider: provider, Model: model}, nil
+				return &pkg.Conversation{ID: "abc"}, nil
 			},
 		}
 		s := NewConversationService(repo, &mockMsgRepo{}, slog.Default())
-		c, err := s.Create(context.Background(), "test", "openai", "gpt-4")
+		c, err := s.Create(context.Background(), "test")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -263,7 +236,7 @@ func TestConversationService_Delete(t *testing.T) {
 }
 
 func TestConversationService_GetMessages(t *testing.T) {
-	expected := []pkg.Message{{ID: "m1", Content: "hello"}}
+	expected := []pkg.Message{{ID: "m1", Content: "hello", Provider: "openai", Model: "gpt-4"}}
 	msgRepo := &mockMsgRepo{
 		getByConversationFn: func(_ context.Context, conversationID string) ([]pkg.Message, error) {
 			return expected, nil

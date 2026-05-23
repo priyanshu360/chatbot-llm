@@ -7,12 +7,14 @@ export function Sidebar() {
   const currentConversationId = useChatStore((s) => s.currentConversationId)
   const setCurrentConversation = useChatStore((s) => s.setCurrentConversation)
   const setMessages = useChatStore((s) => s.setMessages)
+  const cancelAllStreams = useChatStore((s) => s.cancelAllStreams)
 
   const deleteMutation = useDeleteConversation()
   const cancelMutation = useCancelConversation()
   const resumeMutation = useResumeConversation()
 
   const handleSelect = async (id: string) => {
+    cancelAllStreams()
     setCurrentConversation(id)
     try {
       const msgs = await api.getMessages(id)
@@ -23,6 +25,7 @@ export function Sidebar() {
   }
 
   const handleNew = () => {
+    cancelAllStreams()
     setCurrentConversation(null)
     setMessages([])
   }
@@ -60,10 +63,7 @@ export function Sidebar() {
             }`}
             onClick={() => handleSelect(conv.id)}
           >
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-medium text-gray-500 uppercase">
-                {conv.provider}
-              </span>
+            <div className="flex items-center justify-end mb-1">
               <span
                 className={`text-xs px-1.5 py-0.5 rounded ${
                   conv.status === 'active'

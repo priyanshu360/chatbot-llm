@@ -3,8 +3,6 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE TABLE conversations (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title       TEXT NOT NULL DEFAULT '',
-  provider    TEXT NOT NULL,
-  model       TEXT NOT NULL,
   status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'cancelled')),
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -16,6 +14,8 @@ CREATE TABLE messages (
   role            TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
   content         TEXT NOT NULL,
   content_redacted TEXT,
+  provider        TEXT NOT NULL,
+  model           TEXT NOT NULL,
   seq             INT NOT NULL,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );

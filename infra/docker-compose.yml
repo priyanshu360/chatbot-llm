@@ -50,6 +50,21 @@ services:
       redis:
         condition: service_healthy
 
+  grafana:
+    image: grafana/grafana:11.0.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana:/var/lib/grafana
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   worker:
     build:
       context: ..
@@ -105,9 +120,11 @@ services:
       dockerfile: infra/docker/Dockerfile.frontend
     ports:
       - "5173:80"
+    restart: unless-stopped
     depends_on:
       - chat-api
 
 volumes:
   pgdata:
   redisdata:
+  grafana:

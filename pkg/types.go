@@ -39,26 +39,24 @@ type SSEEvent struct {
 type Conversation struct {
 	ID        string    `json:"id"`
 	Title     string    `json:"title"`
-	Provider  string    `json:"provider"`
-	Model     string    `json:"model"`
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type Message struct {
-	ID              string    `json:"id"`
-	ConversationID  string    `json:"conversation_id"`
-	Role            string    `json:"role"`
-	Content         string    `json:"content"`
-	Seq             int       `json:"seq"`
-	CreatedAt       time.Time `json:"created_at"`
+	ID             string    `json:"id"`
+	ConversationID string    `json:"conversation_id"`
+	Role           string    `json:"role"`
+	Content        string    `json:"content"`
+	Provider       string    `json:"provider"`
+	Model          string    `json:"model"`
+	Seq            int       `json:"seq"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 type CreateConversationRequest struct {
-	Title    string `json:"title"`
-	Provider string `json:"provider"`
-	Model    string `json:"model"`
+	Title string `json:"title"`
 }
 
 type UpdateConversationRequest struct {

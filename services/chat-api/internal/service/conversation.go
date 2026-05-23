@@ -19,14 +19,8 @@ func NewConversationService(convRepo ConversationRepository, msgRepo MessageRepo
 	return &ConversationService{convRepo: convRepo, msgRepo: msgRepo, logger: logger}
 }
 
-func (s *ConversationService) Create(ctx context.Context, title, provider, model string) (*pkg.Conversation, error) {
-	if provider == "" {
-		return nil, &InputError{Field: "provider", Message: "provider is required"}
-	}
-	if model == "" {
-		return nil, &InputError{Field: "model", Message: "model is required"}
-	}
-	return s.convRepo.Create(ctx, title, provider, model)
+func (s *ConversationService) Create(ctx context.Context, title string) (*pkg.Conversation, error) {
+	return s.convRepo.Create(ctx, title)
 }
 
 func (s *ConversationService) Get(ctx context.Context, id string) (*pkg.Conversation, error) {

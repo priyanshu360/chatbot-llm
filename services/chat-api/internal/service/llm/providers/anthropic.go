@@ -1,25 +1,20 @@
 package providers
 
 import (
-	"bufio"
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"strings"
+	"errors"
+
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
 )
 
 type AnthropicProvider struct {
-	apiKey  string
-	baseURL string
+	client *anthropic.Client
 }
 
 func NewAnthropic(apiKey string) *AnthropicProvider {
-	return &AnthropicProvider{
-		apiKey:  apiKey,
-		baseURL: "https://api.anthropic.com/v1",
-	}
+	c := anthropic.NewClient(option.WithAPIKey(apiKey))
+	return &AnthropicProvider{client: &c}
 }
 
 func (p *AnthropicProvider) Name() string { return "anthropic" }
@@ -30,111 +25,59 @@ func (p *AnthropicProvider) StreamChat(ctx context.Context, req ChatRequest) (<-
 	go func() {
 		defer close(ch)
 
-		systemContent := ""
-		var msgs []map[string]string
+		var systemContent string
+		var msgs []anthropic.MessageParam
 		for _, m := range req.Messages {
 			if m.Role == "system" {
 				systemContent = m.Content
 				continue
 			}
-			role := m.Role
-			if role == "assistant" {
-				role = "assistant"
+			if m.Role == "assistant" {
+				msgs = append(msgs, anthropic.NewAssistantMessage(anthropic.NewTextBlock(m.Content)))
+			} else {
+				msgs = append(msgs, anthropic.NewUserMessage(anthropic.NewTextBlock(m.Content)))
 			}
-			msgs = append(msgs, map[string]string{"role": role, "content": m.Content})
 		}
 
-		body := map[string]interface{}{
-			"model":      req.Model,
-			"messages":   msgs,
-			"stream":     true,
-			"max_tokens": 4096,
+		params := anthropic.MessageNewParams{
+			Model:     anthropic.Model(req.Model),
+			MaxTokens: 4096,
+			Messages:  msgs,
 		}
 		if systemContent != "" {
-			body["system"] = systemContent
+			params.System = []anthropic.TextBlockParam{{Text: systemContent}}
 		}
 
-		payload, _ := json.Marshal(body)
-		httpReq, err := http.NewRequestWithContext(ctx, "POST", p.baseURL+"/messages", bytes.NewReader(payload))
-		if err != nil {
-			ch <- StreamEvent{Error: fmt.Errorf("request creation failed: %w", err)}
-			return
-		}
+		stream := p.client.Messages.NewStreaming(ctx, params)
 
-		httpReq.Header.Set("x-api-key", p.apiKey)
-		httpReq.Header.Set("anthropic-version", "2023-06-01")
-		httpReq.Header.Set("Content-Type", "application/json")
-
-		resp, err := http.DefaultClient.Do(httpReq)
-		if err != nil {
-			ch <- StreamEvent{Error: fmt.Errorf("api call failed: %w", err)}
-			return
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			ch <- StreamEvent{Error: &APIError{StatusCode: resp.StatusCode, Detail: readErrorBody(resp)}}
-			return
-		}
-
-		inputTokens := 0
-		outputTokens := 0
-		scanner := bufio.NewScanner(resp.Body)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if !strings.HasPrefix(line, "data: ") {
-				continue
-			}
-
-			data := strings.TrimPrefix(line, "data: ")
-			if strings.TrimSpace(data) == "" {
-				continue
-			}
-
-			var event struct {
-				Type string `json:"type"`
-				Delta struct {
-					Text string `json:"text"`
-				} `json:"delta"`
-				Message struct {
-					Usage *struct {
-						InputTokens  int `json:"input_tokens"`
-						OutputTokens int `json:"output_tokens"`
-					} `json:"usage"`
-				} `json:"message"`
-				ContentBlock *struct {
-					Text string `json:"text"`
-				} `json:"content_block"`
-			}
-
-			if err := json.Unmarshal([]byte(data), &event); err != nil {
-				continue
-			}
-
-			switch event.Type {
-			case "message_start":
-				if event.Message.Usage != nil {
-					inputTokens = event.Message.Usage.InputTokens
-				}
-			case "content_block_delta":
-				if event.Delta.Text != "" {
-					ch <- StreamEvent{Delta: event.Delta.Text}
-				}
-			case "message_delta":
-				if usage := event.Message.Usage; usage != nil {
-					outputTokens = usage.OutputTokens
-				}
-			case "message_stop":
-				ch <- StreamEvent{
-					Finish: true,
-					Usage:  &TokenUsage{InputTokens: inputTokens, OutputTokens: outputTokens},
-				}
+		var msg anthropic.Message
+		for stream.Next() {
+			event := stream.Current()
+			if err := msg.Accumulate(event); err != nil {
+				ch <- StreamEvent{Error: err}
 				return
 			}
+			if event.Type == "content_block_delta" && event.Delta.Text != "" {
+				ch <- StreamEvent{Delta: event.Delta.Text}
+			}
 		}
 
-		if err := scanner.Err(); err != nil {
-			ch <- StreamEvent{Error: fmt.Errorf("stream read error: %w", err)}
+		if err := stream.Err(); err != nil {
+			var apiErr *anthropic.Error
+			if errors.As(err, &apiErr) {
+				ch <- StreamEvent{Error: &APIError{StatusCode: apiErr.StatusCode, Detail: apiErr.Error()}}
+			} else {
+				ch <- StreamEvent{Error: err}
+			}
+			return
+		}
+
+		ch <- StreamEvent{
+			Finish: true,
+			Usage: &TokenUsage{
+				InputTokens:  int(msg.Usage.InputTokens),
+				OutputTokens: int(msg.Usage.OutputTokens),
+			},
 		}
 	}()
 

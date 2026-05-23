@@ -4,6 +4,7 @@ import {
   ChatRequestSchema,
   CreateConversationSchema,
   UpdateConversationSchema,
+  ProviderSchema,
   SSEEventSchemas,
   safeParseResponse,
   type Conversation,
@@ -11,6 +12,7 @@ import {
   type ChatRequest,
   type ChatMeta,
   type ChatDone,
+  type Providers,
 } from './schemas'
 
 const BASE = '/api'
@@ -60,6 +62,13 @@ export async function createConversation(title: string, provider: string, model:
     body: JSON.stringify(body),
   })
   const result = safeParseResponse(ConversationSchema, data)
+  if (!result.success) throw new Error(result.error)
+  return result.data
+}
+
+export async function fetchProviders(): Promise<Providers> {
+  const data = await fetchJSON<unknown>(`${BASE}/providers`)
+  const result = safeParseResponse(ProviderSchema, data)
   if (!result.success) throw new Error(result.error)
   return result.data
 }

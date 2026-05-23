@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useIsFetching } from '@tanstack/react-query'
+import Markdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useChatStore } from '../stores/chat'
 
 function Spinner() {
@@ -52,7 +54,15 @@ export function ChatWindow() {
                 : 'bg-gray-100 text-gray-900'
             }`}
           >
-            <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+            {msg.role === 'user' ? (
+              <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+            ) : (
+              <div className="prose prose-sm max-w-none">
+                <Markdown remarkPlugins={[remarkGfm]}>
+                  {msg.content}
+                </Markdown>
+              </div>
+            )}
           </div>
         </div>
       ))}
@@ -60,12 +70,14 @@ export function ChatWindow() {
       {streamEntries.map(([sessionId, stream]) => (
         <div key={sessionId} className="flex justify-start">
           <div className="max-w-[70%] rounded-lg px-4 py-2 bg-gray-100 text-gray-900">
-            <p className="whitespace-pre-wrap text-sm">
-              {stream.content}
-              {stream.active && (
-                <span className="inline-block w-2 h-4 bg-gray-400 animate-pulse ml-0.5" />
-              )}
-            </p>
+            <div className="prose prose-sm max-w-none">
+              <Markdown remarkPlugins={[remarkGfm]}>
+                {stream.content}
+              </Markdown>
+            </div>
+            {stream.active && (
+              <span className="inline-block w-2 h-4 bg-gray-400 animate-pulse ml-0.5" />
+            )}
           </div>
         </div>
       ))}

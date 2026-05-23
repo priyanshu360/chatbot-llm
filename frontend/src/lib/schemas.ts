@@ -40,7 +40,7 @@ export const ChatDoneSchema = z.object({
   usage: z.object({
     input_tokens: z.number().int().nonnegative(),
     output_tokens: z.number().int().nonnegative(),
-  }).optional(),
+  }).nullable().optional(),
 })
 export type ChatDone = z.infer<typeof ChatDoneSchema>
 
@@ -49,6 +49,11 @@ export const CreateConversationSchema = z.object({
   provider: z.string().min(1),
   model: z.string().min(1),
 })
+
+export const ProviderSchema = z.record(z.string(), z.object({
+  models: z.array(z.string()),
+}))
+export type Providers = z.infer<typeof ProviderSchema>
 
 export const UpdateConversationSchema = z.object({
   status: z.enum(['active', 'cancelled']),

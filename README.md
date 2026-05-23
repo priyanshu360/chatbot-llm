@@ -144,7 +144,7 @@ Targets:
 Frontend (React + Vite)
     │  SSE stream  │  REST
     ▼              ▼
-Chat API ──→ OpenAI / Anthropic / Gemini
+Chat API ──→ OpenAI / Anthropic / Gemini / Ollama / DeepSeek
     │
     └─ fire-and-forget POST ──→ Ingestion API
                                       │
@@ -170,7 +170,7 @@ services/
 │       ├── transport/     # HTTP handlers, middleware (CORS, logging, rate limit)
 │       ├── service/       # Chat orchestration, conversation CRUD, LLM clients
 │       │   ├── chat.go    # SSE streaming orchestration
-│       │   ├── llm/       # Provider interface + OpenAI/Anthropic/Gemini SDK
+│   │   ├── llm/       # Provider interface + SDK wrappers (OpenAI/Anthropic/Gemini/Ollama/DeepSeek)
 │       │   └── repo.go    # Repository interfaces
 │       └── repo/          # PostgreSQL data access
 ├── ingestion-api/         # Go: log validation, Redis queue, batch worker

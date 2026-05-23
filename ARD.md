@@ -167,7 +167,7 @@ Unknown models default to 32,000 as a safe fallback.
 
 ### Algorithm
 
-In `StreamChat` (`service/chat.go:99-114`):
+In `StreamChat` (`service/chat.go:98-113`):
 
 1. Compute `budget = contextWindow(provider, model) * 0.8`
 2. Walk `chatHistory` from newest to oldest
@@ -196,7 +196,7 @@ This is message-count-agnostic — it naturally keeps more short messages (rapid
 | **Malformed payload** | Ingestion API writes the raw JSON + validation error to `ingestion_dlq` and returns `422`. The log is never silently dropped | Zero data loss for debugging feed issues |
 | **PostgreSQL slow/full** | Worker pauses consumption. Messages accumulate in Redis stream. Stream hits `MAXLEN` 50k and starts evicting oldest | Backpressure: Redis acts as a shock absorber. Alert when stream length > 10k |
 | **PostgreSQL connection pool exhausted** | Pool waits for a connection (configurable `MaxConns`). Requests queue at the pool level, not HTTP level | `pgxpool` handles this gracefully — no connection storms |
-| **LLM provider timeout** | The `Provider.StreamChat` context is cancelled. The SDK captures `status: "error"` with `error_code`, logs it, and returns the error to the UI | Partial results are not stored — only the error code |
+| **LLM provider timeout** | The `Provider.StreamChat` context is cancelled. The SDK captures `status: "timeout"` with `error_code: "deadline_exceeded"`, logs it, and returns the error to the UI | Partial results are not stored — only the error code |
 | **Client disconnect** | `request.Context()` is cancelled. The Chat API goroutine detects it and tears down the provider stream. No orphaned provider calls | Context propagation ensures cleanup even if the client navigates away mid-stream |
 | **Redis unavailable** | Rate limiter fails open (allows the request). Existing rate limits are temporarily ineffective | Rate limiting is a defense-in-depth measure, not a hard security boundary |
 | **Duplicate inference logs** | `inference_logs` has a `UNIQUE` constraint on `request_id`. Duplicate inserts are silently skipped | At-most-once for storage, at-least-once for queuing — deduped at the DB level |
@@ -209,6 +209,7 @@ This is message-count-agnostic — it naturally keeps more short messages (rapid
 
 | Method | Path | Description |
 |--------|------|-------------|
+| GET | /api/providers | List available providers and their models |
 | POST | /api/chat | Send message, returns SSE stream of tokens |
 | POST | /api/conversations | Create conversation |
 | GET | /api/conversations | List conversations (last 100, ordered by `updated_at`) |
@@ -253,7 +254,7 @@ Queue unavailable returns `503`:
 |--------|------|-------|
 | id | UUID | PK, `gen_random_uuid()` |
 | title | TEXT | User-facing title |
-| provider | TEXT | `openai` / `anthropic` / `gemini` |
+| provider | TEXT | `openai` / `anthropic` / `gemini` / `ollama` / `deepseek` |
 | model | TEXT | e.g. `gpt-4o`, `claude-sonnet-4` |
 | status | TEXT | `active` / `cancelled`, CHECK constraint |
 | created_at | TIMESTAMPTZ | |

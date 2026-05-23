@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -40,7 +41,7 @@ func uuid() string {
 		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
-func (c *LLMClient) StreamChat(ctx context.Context, req providers.ChatRequest, conversationID, sessionID string) *StreamResult {
+func (c *LLMClient) StreamChat(ctx context.Context, req providers.ChatRequest, conversationID, sessionID, messageID string) *StreamResult {
 	requestID := uuid()
 	c.slog.Debug("stream chat start", "request_id", requestID, "conversation_id", conversationID, "model", req.Model)
 
@@ -62,6 +63,7 @@ func (c *LLMClient) StreamChat(ctx context.Context, req providers.ChatRequest, c
 		var inputTokens, outputTokens int
 		var tokenCount int
 		status := "success"
+		var errorCode string
 
 		if len(req.Messages) > 0 {
 			lastInputPreview = RedactPII(truncate(req.Messages[len(req.Messages)-1].Content, 200))
@@ -70,6 +72,11 @@ func (c *LLMClient) StreamChat(ctx context.Context, req providers.ChatRequest, c
 		for evt := range providerCh {
 			if evt.Error != nil {
 				status = "error"
+				errorCode = evt.Error.Error()
+				if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+					status = "timeout"
+					errorCode = "deadline_exceeded"
+				}
 				c.slog.Debug("provider stream error", "request_id", requestID, "error", evt.Error)
 				out <- StreamEvent{Error: evt.Error}
 				break
@@ -98,12 +105,14 @@ func (c *LLMClient) StreamChat(ctx context.Context, req providers.ChatRequest, c
 			RequestID:      requestID,
 			SessionID:      sessionID,
 			ConversationID: conversationID,
+			MessageID:      messageID,
 			Model:          req.Model,
 			Provider:       c.provider.Name(),
 			LatencyMs:      latencyMs,
 			InputTokens:    inputTokens,
 			OutputTokens:   outputTokens,
 			Status:         status,
+			ErrorCode:      errorCode,
 			InputPreview:   lastInputPreview,
 			OutputPreview:  RedactPII(truncate(lastOutputPreview, 200)),
 			Timestamp:      time.Now().UTC().Format(time.RFC3339),

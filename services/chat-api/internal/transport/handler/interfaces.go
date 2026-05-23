@@ -19,4 +19,5 @@ type ConversationService interface {
 
 type ChatService interface {
 	StreamChat(ctx context.Context, providerName, model, message, conversationID string) (*service.StreamResult, error)
+	ListProviders() map[string]service.ProviderInfo
 }

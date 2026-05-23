@@ -75,6 +75,14 @@ func main() {
 	)
 	ingestionLogger := llm.NewLogger(ingestionURL, logger)
 
+	knownModels := map[string][]string{
+		"openai":    {"gpt-4o", "gpt-4o-mini"},
+		"anthropic": {"claude-sonnet-4-6", "claude-haiku-4-5"},
+		"gemini":    {"gemini-2.5-flash", "gemini-1.5-flash"},
+		"ollama":    {"llama3.2", "llama3.1", "mistral", "phi4"},
+		"deepseek":  {"deepseek-chat", "deepseek-reasoner"},
+	}
+
 	llmClients := make(map[string]service.LLMClient)
 
 	if key := os.Getenv("OPENAI_API_KEY"); key != "" {
@@ -89,16 +97,32 @@ func main() {
 		llmClients["gemini"] = llm.NewLLMClient(providers.NewGemini(key), ingestionLogger, logger)
 		logger.Info("registered provider", "provider", "gemini")
 	}
+	if baseURL := os.Getenv("OLLAMA_BASE_URL"); baseURL != "" {
+		llmClients["ollama"] = llm.NewLLMClient(providers.NewOllama(baseURL), ingestionLogger, logger)
+		logger.Info("registered provider", "provider", "ollama")
+	}
+	if key := os.Getenv("DEEPSEEK_API_KEY"); key != "" {
+		llmClients["deepseek"] = llm.NewLLMClient(providers.NewDeepSeek(key), ingestionLogger, logger)
+		logger.Info("registered provider", "provider", "deepseek")
+	}
 
 	if len(llmClients) == 0 {
 		logger.Warn("no LLM providers configured")
 	}
 
+	providerModels := make(map[string][]string, len(llmClients))
+	for name := range llmClients {
+		if models, ok := knownModels[name]; ok {
+			providerModels[name] = models
+		}
+	}
+
 	convSvc := service.NewConversationService(convRepo, msgRepo, logger)
-	chatSvc := service.NewChatService(convRepo, msgRepo, llmClients, logger)
+	chatSvc := service.NewChatService(convRepo, msgRepo, llmClients, providerModels, logger)
 
 	msgHandler := handler.NewMessagesHandler(convSvc, logger)
 	mux := http.NewServeMux()
+	mux.Handle("/api/providers", handler.NewProvidersHandler(chatSvc, logger))
 	mux.Handle("/api/chat", handler.NewChatHandler(chatSvc, logger))
 	mux.Handle("/api/conversations", handler.NewConversationsHandler(convSvc, msgHandler, logger))
 	mux.Handle("/api/conversations/", handler.NewConversationsHandler(convSvc, msgHandler, logger))

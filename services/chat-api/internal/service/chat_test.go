@@ -13,17 +13,17 @@ import (
 )
 
 type mockLLMClient struct {
-	streamChatFn func(ctx context.Context, req providers.ChatRequest, conversationID, sessionID string) *llm.StreamResult
+	streamChatFn func(ctx context.Context, req providers.ChatRequest, conversationID, sessionID, messageID string) *llm.StreamResult
 }
 
-func (m *mockLLMClient) StreamChat(ctx context.Context, req providers.ChatRequest, conversationID, sessionID string) *llm.StreamResult {
-	return m.streamChatFn(ctx, req, conversationID, sessionID)
+func (m *mockLLMClient) StreamChat(ctx context.Context, req providers.ChatRequest, conversationID, sessionID, messageID string) *llm.StreamResult {
+	return m.streamChatFn(ctx, req, conversationID, sessionID, messageID)
 }
 
 var _ LLMClient = (*mockLLMClient)(nil)
 
 func TestChatService_StreamChat_UnknownProvider(t *testing.T) {
-	s := NewChatService(&mockConvRepo{}, &mockMsgRepo{}, map[string]LLMClient{}, slog.Default())
+	s := NewChatService(&mockConvRepo{}, &mockMsgRepo{}, map[string]LLMClient{}, nil, slog.Default())
 	_, err := s.StreamChat(context.Background(), "nonexistent", "gpt-4", "hello", "")
 	var inputErr *InputError
 	if !errors.As(err, &inputErr) {
@@ -35,7 +35,7 @@ func TestChatService_StreamChat_UnknownProvider(t *testing.T) {
 }
 
 func TestChatService_StreamChat_EmptyMessage(t *testing.T) {
-	s := NewChatService(&mockConvRepo{}, &mockMsgRepo{}, map[string]LLMClient{"openai": &mockLLMClient{}}, slog.Default())
+	s := NewChatService(&mockConvRepo{}, &mockMsgRepo{}, map[string]LLMClient{"openai": &mockLLMClient{}}, nil, slog.Default())
 	_, err := s.StreamChat(context.Background(), "openai", "gpt-4", "", "")
 	var inputErr *InputError
 	if !errors.As(err, &inputErr) {
@@ -66,7 +66,7 @@ func TestChatService_StreamChat_CancelledConversation(t *testing.T) {
 			return &pkg.Message{ID: "msg-1"}, nil
 		},
 	}
-	s := NewChatService(convRepo, msgRepo, map[string]LLMClient{"openai": &mockLLMClient{}}, slog.Default())
+	s := NewChatService(convRepo, msgRepo, map[string]LLMClient{"openai": &mockLLMClient{}}, nil, slog.Default())
 	_, err := s.StreamChat(context.Background(), "openai", "gpt-4", "hello", "")
 	if !errors.Is(err, ErrConversationCancelled) {
 		t.Fatalf("expected ErrConversationCancelled, got %v", err)
@@ -99,14 +99,14 @@ func TestChatService_StreamChat_NewConversation(t *testing.T) {
 		},
 	}
 	llmClient := &mockLLMClient{
-		streamChatFn: func(ctx context.Context, req providers.ChatRequest, conversationID, sessionID string) *llm.StreamResult {
+		streamChatFn: func(ctx context.Context, req providers.ChatRequest, conversationID, sessionID, messageID string) *llm.StreamResult {
 			ch := make(chan llm.StreamEvent, 1)
 			ch <- llm.StreamEvent{Done: true}
 			close(ch)
 			return &llm.StreamResult{Events: ch, RequestID: "req-1"}
 		},
 	}
-	s := NewChatService(convRepo, msgRepo, map[string]LLMClient{"openai": llmClient}, slog.Default())
+	s := NewChatService(convRepo, msgRepo, map[string]LLMClient{"openai": llmClient}, nil, slog.Default())
 	result, err := s.StreamChat(context.Background(), "openai", "gpt-4", "hello", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -143,7 +143,7 @@ func TestChatService_StreamChat_ExistingConversation(t *testing.T) {
 		},
 	}
 	llmClient := &mockLLMClient{
-		streamChatFn: func(ctx context.Context, req providers.ChatRequest, conversationID, sessionID string) *llm.StreamResult {
+		streamChatFn: func(ctx context.Context, req providers.ChatRequest, conversationID, sessionID, messageID string) *llm.StreamResult {
 			if len(req.Messages) != 3 {
 				t.Errorf("expected 3 messages (2 history + 1 new), got %d", len(req.Messages))
 			}
@@ -153,7 +153,7 @@ func TestChatService_StreamChat_ExistingConversation(t *testing.T) {
 			return &llm.StreamResult{Events: ch, RequestID: "req-1"}
 		},
 	}
-	s := NewChatService(convRepo, msgRepo, map[string]LLMClient{"openai": llmClient}, slog.Default())
+	s := NewChatService(convRepo, msgRepo, map[string]LLMClient{"openai": llmClient}, nil, slog.Default())
 	result, err := s.StreamChat(context.Background(), "openai", "gpt-4", "new message", "existing-conv")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -169,7 +169,7 @@ func TestChatService_StreamChat_RepoNotFound(t *testing.T) {
 			return nil, repo.ErrNotFound
 		},
 	}
-	s := NewChatService(convRepo, &mockMsgRepo{}, map[string]LLMClient{"openai": &mockLLMClient{}}, slog.Default())
+	s := NewChatService(convRepo, &mockMsgRepo{}, map[string]LLMClient{"openai": &mockLLMClient{}}, nil, slog.Default())
 	_, err := s.StreamChat(context.Background(), "openai", "gpt-4", "hello", "nonexistent")
 	if !errors.Is(err, ErrConversationNotFound) {
 		t.Fatalf("expected ErrConversationNotFound, got %v", err)

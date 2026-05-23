@@ -20,6 +20,8 @@ func (m *mockChatSvc) StreamChat(ctx context.Context, providerName, model, messa
 	return m.streamChatFn(ctx, providerName, model, message, conversationID)
 }
 
+func (m *mockChatSvc) ListProviders() map[string]service.ProviderInfo { return nil }
+
 var _ ChatService = (*mockChatSvc)(nil)
 
 func TestChatHandler_Post(t *testing.T) {

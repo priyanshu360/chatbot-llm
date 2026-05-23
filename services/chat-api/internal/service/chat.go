@@ -12,18 +12,31 @@ import (
 )
 
 type LLMClient interface {
-	StreamChat(ctx context.Context, req providers.ChatRequest, conversationID, sessionID string) *llm.StreamResult
+	StreamChat(ctx context.Context, req providers.ChatRequest, conversationID, sessionID, messageID string) *llm.StreamResult
 }
 
 type ChatService struct {
-	convRepo ConversationRepository
-	msgRepo  MessageRepository
-	clients  map[string]LLMClient
-	logger   *slog.Logger
+	convRepo       ConversationRepository
+	msgRepo        MessageRepository
+	clients        map[string]LLMClient
+	providerModels map[string][]string
+	logger         *slog.Logger
 }
 
-func NewChatService(convRepo ConversationRepository, msgRepo MessageRepository, clients map[string]LLMClient, logger *slog.Logger) *ChatService {
-	return &ChatService{convRepo: convRepo, msgRepo: msgRepo, clients: clients, logger: logger}
+func NewChatService(convRepo ConversationRepository, msgRepo MessageRepository, clients map[string]LLMClient, providerModels map[string][]string, logger *slog.Logger) *ChatService {
+	return &ChatService{convRepo: convRepo, msgRepo: msgRepo, clients: clients, providerModels: providerModels, logger: logger}
+}
+
+type ProviderInfo struct {
+	Models []string `json:"models"`
+}
+
+func (s *ChatService) ListProviders() map[string]ProviderInfo {
+	result := make(map[string]ProviderInfo, len(s.providerModels))
+	for name, models := range s.providerModels {
+		result[name] = ProviderInfo{Models: models}
+	}
+	return result
 }
 
 type StreamResult struct {
@@ -70,7 +83,7 @@ func (s *ChatService) StreamChat(ctx context.Context, providerName, model, messa
 		return nil, fmt.Errorf("get sequence: %w", err)
 	}
 
-	userMsg, err := s.msgRepo.Insert(ctx, conversationID, "user", message, message, seq)
+	userMsg, err := s.msgRepo.Insert(ctx, conversationID, "user", message, llm.RedactPII(message), seq)
 	if err != nil {
 		return nil, fmt.Errorf("save user message: %w", err)
 	}
@@ -83,15 +96,28 @@ func (s *ChatService) StreamChat(ctx context.Context, providerName, model, messa
 	chatHistory := toProviderMessages(messages)
 	chatHistory = append(chatHistory, providers.ChatMessage{Role: "user", Content: message})
 
-	if len(chatHistory) > 20 {
-		chatHistory = chatHistory[len(chatHistory)-20:]
+	{
+		const budgetRatio = 0.8
+		budget := int(float64(contextWindow(providerName, model)) * budgetRatio)
+
+		var keep int
+		for i := len(chatHistory) - 1; i >= 0; i-- {
+			t := estimateTokens(chatHistory[i].Content)
+			if i == len(chatHistory)-1 || budget-t >= 0 {
+				budget -= t
+				keep = i
+			} else {
+				break
+			}
+		}
+		chatHistory = chatHistory[keep:]
 	}
 
 	s.logger.Debug("calling LLM provider", "provider", providerName, "model", model, "history_len", len(chatHistory))
 	result := client.StreamChat(ctx, providers.ChatRequest{
 		Messages: chatHistory,
 		Model:    model,
-	}, conversationID, conversationID)
+	}, conversationID, conversationID, userMsg.ID)
 
 	wrapped := make(chan llm.StreamEvent)
 	go func() {
@@ -102,7 +128,7 @@ func (s *ChatService) StreamChat(ctx context.Context, providerName, model, messa
 				fullContent += evt.Delta
 			}
 			if evt.Done {
-				if _, err := s.msgRepo.Insert(ctx, conversationID, "assistant", fullContent, fullContent, seq+1); err != nil {
+				if _, err := s.msgRepo.Insert(ctx, conversationID, "assistant", fullContent, llm.RedactPII(fullContent), seq+1); err != nil {
 					s.logger.Error("save assistant message", "error", err)
 				}
 			}

@@ -66,7 +66,7 @@ data:
           "datasource": { "type": "postgres", "uid": "PostgreSQL" },
           "targets": [
             {
-              "rawSql": "SELECT COUNT(*) AS \"total\" FROM inference_logs WHERE $__timeFilter(created_at)",
+              "rawSql": "SELECT COUNT(*) AS \"total\" FROM inference_logs WHERE $__timeFilter(created_at) AND provider IN ($provider) AND model IN ($model)",
               "format": "table",
               "refId": "A"
             }
@@ -98,7 +98,7 @@ data:
           "datasource": { "type": "postgres", "uid": "PostgreSQL" },
           "targets": [
             {
-              "rawSql": "SELECT COUNT(*) FILTER (WHERE status != 'success') * 100.0 / NULLIF(COUNT(*), 0) AS \"error_rate\" FROM inference_logs WHERE $__timeFilter(created_at)",
+              "rawSql": "SELECT COUNT(*) FILTER (WHERE status != 'success') * 100.0 / NULLIF(COUNT(*), 0) AS \"error_rate\" FROM inference_logs WHERE $__timeFilter(created_at) AND provider IN ($provider) AND model IN ($model)",
               "format": "table",
               "refId": "A"
             }
@@ -139,7 +139,7 @@ data:
           "datasource": { "type": "postgres", "uid": "PostgreSQL" },
           "targets": [
             {
-              "rawSql": "SELECT AVG(latency_ms) AS \"avg_latency\" FROM inference_logs WHERE $__timeFilter(created_at)",
+              "rawSql": "SELECT AVG(latency_ms) AS \"avg_latency\" FROM inference_logs WHERE $__timeFilter(created_at) AND provider IN ($provider) AND model IN ($model)",
               "format": "table",
               "refId": "A"
             }
@@ -171,7 +171,7 @@ data:
           "datasource": { "type": "postgres", "uid": "PostgreSQL" },
           "targets": [
             {
-              "rawSql": "SELECT SUM(total_tokens) AS \"total_tokens\" FROM inference_logs WHERE $__timeFilter(created_at)",
+              "rawSql": "SELECT SUM(total_tokens) AS \"total_tokens\" FROM inference_logs WHERE $__timeFilter(created_at) AND provider IN ($provider) AND model IN ($model)",
               "format": "table",
               "refId": "A"
             }
@@ -211,7 +211,7 @@ data:
           "datasource": { "type": "postgres", "uid": "PostgreSQL" },
           "targets": [
             {
-              "rawSql": "SELECT\n  $__timeGroup(created_at, '5m') AS time,\n  percentile_cont(0.50) WITHIN GROUP (ORDER BY latency_ms) AS p50,\n  percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) AS p95,\n  percentile_cont(0.99) WITHIN GROUP (ORDER BY latency_ms) AS p99\nFROM inference_logs\nWHERE $__timeFilter(created_at)\nGROUP BY 1\nORDER BY 1",
+              "rawSql": "SELECT\n  $__timeGroup(created_at, '5m') AS time,\n  percentile_cont(0.50) WITHIN GROUP (ORDER BY latency_ms) AS p50,\n  percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) AS p95,\n  percentile_cont(0.99) WITHIN GROUP (ORDER BY latency_ms) AS p99\nFROM inference_logs\nWHERE $__timeFilter(created_at) AND provider IN ($provider) AND model IN ($model)\nGROUP BY 1\nORDER BY 1",
               "format": "time_series",
               "refId": "A"
             }
@@ -273,7 +273,7 @@ data:
           "datasource": { "type": "postgres", "uid": "PostgreSQL" },
           "targets": [
             {
-              "rawSql": "SELECT $__timeGroup(created_at, '5m') AS time, COUNT(*) AS \"rpm\" FROM inference_logs WHERE $__timeFilter(created_at) GROUP BY 1 ORDER BY 1",
+              "rawSql": "SELECT $__timeGroup(created_at, '5m') AS time, COUNT(*) AS \"rpm\" FROM inference_logs WHERE $__timeFilter(created_at) AND provider IN ($provider) AND model IN ($model) GROUP BY 1 ORDER BY 1",
               "format": "time_series",
               "refId": "A"
             }
@@ -327,7 +327,7 @@ data:
           "datasource": { "type": "postgres", "uid": "PostgreSQL" },
           "targets": [
             {
-              "rawSql": "SELECT provider, COUNT(*) AS count FROM inference_logs WHERE $__timeFilter(created_at) GROUP BY provider ORDER BY count DESC",
+              "rawSql": "SELECT provider, COUNT(*) AS count FROM inference_logs WHERE $__timeFilter(created_at) AND provider IN ($provider) AND model IN ($model) GROUP BY provider ORDER BY count DESC",
               "format": "table",
               "refId": "A"
             }
@@ -357,7 +357,7 @@ data:
           "datasource": { "type": "postgres", "uid": "PostgreSQL" },
           "targets": [
             {
-              "rawSql": "SELECT model, COUNT(*) AS count FROM inference_logs WHERE $__timeFilter(created_at) GROUP BY model ORDER BY count DESC LIMIT 10",
+              "rawSql": "SELECT model, COUNT(*) AS count FROM inference_logs WHERE $__timeFilter(created_at) AND provider IN ($provider) AND model IN ($model) GROUP BY model ORDER BY count DESC LIMIT 10",
               "format": "table",
               "refId": "A"
             }
@@ -397,7 +397,7 @@ data:
           "datasource": { "type": "postgres", "uid": "PostgreSQL" },
           "targets": [
             {
-              "rawSql": "SELECT\n  $__timeGroup(created_at, '5m') AS time,\n  COUNT(*) FILTER (WHERE status != 'success') * 100.0 / NULLIF(COUNT(*), 0) AS \"error_rate\"\nFROM inference_logs\nWHERE $__timeFilter(created_at)\nGROUP BY 1\nORDER BY 1",
+              "rawSql": "SELECT\n  $__timeGroup(created_at, '5m') AS time,\n  COUNT(*) FILTER (WHERE status != 'success') * 100.0 / NULLIF(COUNT(*), 0) AS \"error_rate\"\nFROM inference_logs\nWHERE $__timeFilter(created_at) AND provider IN ($provider) AND model IN ($model)\nGROUP BY 1\nORDER BY 1",
               "format": "time_series",
               "refId": "A"
             }
@@ -459,7 +459,7 @@ data:
           "datasource": { "type": "postgres", "uid": "PostgreSQL" },
           "targets": [
             {
-              "rawSql": "SELECT COALESCE(error_code, 'unknown') AS code, COUNT(*) AS count FROM inference_logs WHERE $__timeFilter(created_at) AND status != 'success' GROUP BY error_code ORDER BY count DESC",
+              "rawSql": "SELECT COALESCE(error_code, 'unknown') AS code, COUNT(*) AS count FROM inference_logs WHERE $__timeFilter(created_at) AND status != 'success' AND provider IN ($provider) AND model IN ($model) GROUP BY error_code ORDER BY count DESC",
               "format": "table",
               "refId": "A"
             }
@@ -491,7 +491,7 @@ data:
           "datasource": { "type": "postgres", "uid": "PostgreSQL" },
           "targets": [
             {
-              "rawSql": "SELECT created_at, provider, model, status, error_code, latency_ms, output_preview FROM inference_logs WHERE $__timeFilter(created_at) AND status != 'success' ORDER BY created_at DESC LIMIT 50",
+              "rawSql": "SELECT created_at, provider, model, status, error_code, latency_ms, output_preview FROM inference_logs WHERE $__timeFilter(created_at) AND status != 'success' AND provider IN ($provider) AND model IN ($model) ORDER BY created_at DESC LIMIT 50",
               "format": "table",
               "refId": "A"
             }
@@ -556,7 +556,7 @@ data:
           "datasource": { "type": "postgres", "uid": "PostgreSQL" },
           "targets": [
             {
-              "rawSql": "SELECT\n  $__timeGroup(created_at, '5m') AS time,\n  SUM(input_tokens) AS \"input\",\n  SUM(output_tokens) AS \"output\",\n  SUM(total_tokens) AS \"total\"\nFROM inference_logs\nWHERE $__timeFilter(created_at)\nGROUP BY 1\nORDER BY 1",
+              "rawSql": "SELECT\n  $__timeGroup(created_at, '5m') AS time,\n  SUM(input_tokens) AS \"input\",\n  SUM(output_tokens) AS \"output\",\n  SUM(total_tokens) AS \"total\"\nFROM inference_logs\nWHERE $__timeFilter(created_at) AND provider IN ($provider) AND model IN ($model)\nGROUP BY 1\nORDER BY 1",
               "format": "time_series",
               "refId": "A"
             }
@@ -621,7 +621,7 @@ data:
           {
             "name": "model",
             "type": "query",
-            "query": "SELECT DISTINCT model FROM inference_logs ORDER BY model",
+            "query": "SELECT DISTINCT model FROM inference_logs WHERE provider IN ($provider) ORDER BY model",
             "datasource": { "type": "postgres", "uid": "PostgreSQL" },
             "refresh": 1,
             "includeAll": true,

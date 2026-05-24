@@ -59,7 +59,7 @@ func errorBody(err error) ErrorBody {
 	}
 
 	return ErrorBody{
-		Error:  err.Error(),
+		Error:  "internal server error",
 		Status: http.StatusInternalServerError,
 	}
 }

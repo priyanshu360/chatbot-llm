@@ -331,3 +331,23 @@ All three upgrade paths preserve the existing SQL queries with minimal changes.
 | raw | JSONB | Full original payload (preserved for replay) |
 | error_msg | TEXT | Human-readable validation error |
 | created_at | TIMESTAMPTZ | |
+
+---
+
+## Future Improvements
+
+### Frontend Error Handling
+
+Add a React error boundary, centralized error state in the Zustand store, a toast notification system, surface streaming/mutation errors to the UI, fix silent `.catch()` swallows, and add network connectivity detection.
+
+### Grafana Dashboard Metrics
+
+Add DLQ monitoring panels (`ingestion_dlq` table), provider breakdown panels (latency/error/token by provider), and cost estimation panels (per-model pricing lookup via SQL `CASE`).
+
+### Elasticsearch Full-Text Search
+
+Index `input_preview` and `output_preview` in Elasticsearch for fast search across inference logs, correlated to the PostgreSQL data via `request_id`.
+
+### Auth & Usage Management
+
+Add user authentication (OAuth2/OIDC or API keys) with per-user rate limits and token budgets. Track per-user spend against tiered pricing plans; expose usage dashboards and enforcement via the ingestion pipeline.

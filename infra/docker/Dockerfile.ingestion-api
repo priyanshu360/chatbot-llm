@@ -1,10 +1,9 @@
 FROM golang:1.22-alpine AS builder
 WORKDIR /app
 COPY services/ingestion-api/go.mod services/ingestion-api/go.sum ./services/ingestion-api/
-COPY services/ingestion-api/vendor ./services/ingestion-api/vendor
 COPY . .
-RUN cd services/ingestion-api && CGO_ENABLED=0 go build -mod=vendor -o /server ./cmd/server && \
-    CGO_ENABLED=0 go build -mod=vendor -o /worker ./cmd/worker
+RUN cd services/ingestion-api && go mod download && CGO_ENABLED=0 go build -o /server ./cmd/server && \
+    CGO_ENABLED=0 go build -o /worker ./cmd/worker
 
 FROM alpine:3.20
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/

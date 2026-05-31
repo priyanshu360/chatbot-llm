@@ -3,7 +3,7 @@
 Multi-provider LLM chat with streaming responses, conversation management, and async inference log ingestion via Redis streams.
 
 ## Demo
-![Demo Video](https://github.com/priyanshu360/chatbot-llm/blob/main/demo-chat-llm.mp4)   
+[![Watch the video](https://img.youtube.com/vi/dkGb84WdLkM/maxresdefault.jpg)](https://youtu.be/dkGb84WdLkM)
 
 ## Quick Start
 
